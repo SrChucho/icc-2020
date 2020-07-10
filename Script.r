@@ -10,6 +10,7 @@ library(mixOmics)
 library(tempdisagg)
 library(forecast)
 library(seasonal)
+#library(fable)
 
 # difference
 d <- 12L
@@ -308,7 +309,7 @@ Acf(diff(diff(econ_dl[, "CONS"])), plot = FALSE)
 # modelacion de outliers consumo
 mx13 <- seas(ts(econ_dl[-is.na(econ_dl[,"CONS"]),"CONS"], 
                 frequency = 12, start = ts_econ_start))
-
+# figure 11
 par(mfrow = c(1,1))
 plot(mx13)
 
@@ -405,38 +406,67 @@ H <- 24
 mat_rmse <- matrix(NA, H, 4)
 colnames(mat_rmse) <- c("base_w_ICC","base_w_o_ICC",
                         "regarima_w_ICC", "regarima_w_o_ICC")
+row.names(mat_rmse) <- row.names(econ_dl)[(nrow(econ_dl)-H):nrow(econ_dl)]
 summary_list <- list()
+
+training_forecasts <- training_lower <- training_upper <- 
+  matrix(NA, H, 4)
+colnames(training_forecasts) <- colnames(training_lower) <- 
+  colnames(training_upper) <- c("base_w_ICC","base_w_o_ICC",
+                                "regarima_w_ICC", "regarima_w_o_ICC")
+
 k <- 1
 
-for(h in H:1 ){ # h <- 24
+for(h in 1:H){ # h <- 23; print(h)
   
   # recortamos las variables de acuerdo a h
   # periodo de entrenamiento
-  econ_training <- econ_dl[1:(nrow(econ_dl) - h),] # dim(econ_sum_sample)
+  econ_training <- econ_dl[1:(nrow(econ_dl) - (H - h + 1)),] # dim(econ_sum_sample)
   econ_training <- ts(econ_training, frequency = 12, start = ts_econ_start)
-  row.names(econ_training) <- row.names(econ_dl)[1:(nrow(econ_dl) - h)]
+  row.names(econ_training) <- row.names(econ_dl)[1:(nrow(econ_dl) - (H - h + 1))]
   
-  icc_training <- icc_inegi_bis[1:(nrow(icc_inegi_bis) - h),]
-  icc_mat_training <- icc_mat[1:(nrow(icc_mat) - h),]
-  df_icc_lags_training <- df_icc_lags[1:(nrow(df_icc_lags) - h),]
-  var_aux_training <- var_aux_rel[1:(nrow(var_aux_rel) - h),]
-  mat_outliers_training <- mat_outliers[1:(nrow(mat_outliers) - h),]
+  icc_training <- icc_inegi_bis[1:(nrow(icc_inegi_bis) - (H - h + 1)),]
+  icc_mat_training <- icc_mat[1:(nrow(icc_mat) - (H - h + 1)),]
+  df_icc_lags_training <- df_icc_lags[1:(nrow(df_icc_lags) - (H - h + 1)),]
+  var_aux_training <- var_aux_rel[1:(nrow(var_aux_rel) - (H - h + 1)),]
+  mat_outliers_training <- mat_outliers[1:(nrow(mat_outliers) - (H - h + 1)),]
 
   # series fuera de muestra
-  econ_test <- econ_dl[(nrow(econ_dl) - h + 1):nrow(econ_dl),]
+  econ_test <- matrix(econ_dl[(nrow(econ_dl) - (H - h)):nrow(econ_dl),],
+          nrow = length((nrow(econ_dl) - (H - h)):nrow(econ_dl)))
+  colnames(econ_test) <- colnames(econ_dl)
+  
   icc_test <- 
-    icc_inegi_bis[(nrow(icc_inegi_bis) - h + 1):nrow(icc_inegi_bis),]  
-  icc_mat_test <- icc_mat[(nrow(icc_mat) - h + 1):nrow(icc_mat),]
-  df_icc_lags_test <- 
-    df_icc_lags[(nrow(df_icc_lags) - h+1):nrow(df_icc_lags),]
-  var_aux_test <- 
-    var_aux_rel[(nrow(var_aux_rel) - h + 1):nrow(var_aux_rel),]
-  mat_outliers_test <- 
-    mat_outliers[(nrow(mat_outliers) - h + 1):nrow(mat_outliers),]
+    matrix(icc_inegi_bis[(nrow(icc_inegi_bis) - (H - h)):nrow(icc_inegi_bis),],
+           nrow = length((nrow(icc_inegi_bis) - (H - h)):nrow(icc_inegi_bis)))
+  colnames(icc_test) <- colnames(icc_inegi_bis)
+  
+  icc_mat_test <- matrix(icc_mat[(nrow(icc_mat) - (H - h)):nrow(icc_mat),],
+           nrow = length((nrow(icc_mat) - (H - h)):nrow(icc_mat)))
+  colnames(icc_mat_test) <- colnames(icc_mat)
+  
+  
+  df_icc_lags_test <- df_icc_lags[(nrow(df_icc_lags) - (H - h)):nrow(df_icc_lags),]
+  colnames(df_icc_lags_test) <- colnames(df_icc_lags)
+  
+  var_aux_test <- var_aux_rel[(nrow(var_aux_rel) - (H - h)):nrow(var_aux_rel),]
+  colnames(var_aux_test) <- colnames(var_aux_rel)
+  
+  if(length((nrow(mat_outliers) - (H - h)):nrow(mat_outliers)) == 1){
+    mat_outliers_test <- 
+      t(matrix(mat_outliers[(nrow(mat_outliers) - (H - h)):nrow(mat_outliers),]))
+  }else{
+    mat_outliers_test <- mat_outliers[(nrow(mat_outliers) - (H - h)):nrow(mat_outliers),]
+  }
+  colnames(mat_outliers_test) <- colnames(mat_outliers)
+  
 
   # dim(econ_sub_sample); length(icc_sub_sample); dim(icc_mat_sub_sample)
 
-  # Estimacion de Modelos
+  # dato a pronosticar 
+  econ_training[nrow(econ_training),"CONS"] <- NA
+  
+    # Estimacion de Modelos
   ## 1
   xreg <- cbind(ICC = df_icc_lags_training[,"ICC"], 
                 mat_outliers_training)
@@ -444,98 +474,184 @@ for(h in H:1 ){ # h <- 24
   base_mod <- auto.arima(ts(econ_training[,"CONS"], frequency = 12,
                start = ts_econ_start), allowdrift = FALSE,
                allowmean = FALSE, xreg = xreg)
-  # Base quitando  ICC
+  
+  # reestimamos Base quitando  ICC
+  xreg <- as.matrix(cbind(mat_outliers_training))
   base_mod_noicc <- 
-    arima(ts(econ_training[,"CONS"], frequency = 12,start = ts_econ_start),
+    Arima(ts(econ_training[,"CONS"], frequency = 12,start = ts_econ_start),
           order = c(base_mod$arma[1],base_mod$arma[6],base_mod$arma[2]), 
           seasonal = list(order = c(base_mod$arma[3],base_mod$arma[7],
                       base_mod$arma[4]), period = base_mod$arma[5]),
-                     xreg = as.matrix(cbind(mat_outliers_training)))
+                     xreg = xreg)
   
   # RegARIMA incluyendo ICC
+  xreg <- ts(cbind(mat_outliers_training,
+                   ICC = df_icc_lags_training[,"ICC"],
+                   var_aux_training[,c("TD_O","INF_ANU","spread")]),
+             frequency = 12, start = ts_econ_start)
   regarima_icc <- 
     auto.arima(ts(econ_training[,"CONS"],frequency = 12,
               start = ts_econ_start),
               allowdrift = FALSE, allowmean = FALSE, 
-              xreg = ts(cbind(mat_outliers_training,
-                    df_icc_lags_training[,"ICC"],
-                    var_aux_training[,c("TD_O","INF_ANU","spread")]),
-                    frequency = 12, start = ts_econ_start))
+              xreg = xreg)
   
-  # RegARIMA quitando ICC
+  # reestimamos RegARIMA quitando ICC
+  xreg <- ts(cbind(mat_outliers_training,
+                   var_aux_training[,c("TD_O","INF_ANU","spread")]),
+             frequency = 12,
+             start = ts_econ_start)
   regarima_noicc <- 
-    arima(ts(econ_training[,"CONS"],frequency = 12,start = ts_econ_start),
+    Arima(ts(econ_training[,"CONS"],frequency = 12,start = ts_econ_start),
           order = c(regarima_icc$arma[1],regarima_icc$arma[6],regarima_icc$arma[2]),
           seasonal = list(order = c(regarima_icc$arma[3],regarima_icc$arma[7],
                       regarima_icc$arma[4]),period = regarima_icc$arma[5]),
-          xreg = ts(cbind(mat_outliers_training,
-                          var_aux_training[,c("TD_O","INF_ANU","spread")]),
-                                      frequency = 12,
-                                      start = ts_econ_start) )
-  
+          xreg = xreg )
 
-  # summary(base_mod)
-  # summary(base_mod_noicc)
-  # summary(naive_icc_lag1)
-  # summary(naive_lag1_noicc)
-  # summary(naive_icc_lag12)
-  # summary(naive_lag12_noicc)
   
-  rmse_in_sample <- matrix(NA, 2,2)
-  colnames(rmse_in_sample) <- c("w_ICC", "w_o_ICC")
-  rmse_in_sample[1,"w_ICC"] <- summary(base_mod)[2]
-  rmse_in_sample[1,"w_o_ICC"] <- summary(base_mod_noicc)[2]
-  rmse_in_sample[2,"w_ICC"] <- summary(regarima_icc)[2]
-  rmse_in_sample[2,"w_o_ICC"] <- summary(regarima_noicc)[2]
+  new_xreg <- matrix(NA, 1, 3)
+  new_xreg[,1] <- df_icc_lags_test[1,"ICC"]
+  new_xreg[,c(2,3)] <- mat_outliers_test[1,]
+  colnames(new_xreg) <- c("ICC", colnames(mat_outliers_test))
   
-  mape_in_sample <- matrix(NA, 2,2)
-  colnames(mape_in_sample) <- c("w_ICC", "w_o_ICC")
-  mape_in_sample[1,"w_ICC"] <- summary(base_mod)[5]
-  mape_in_sample[1,"w_o_ICC"] <- summary(base_mod_noicc)[5]
-  mape_in_sample[2,"w_ICC"] <- summary(regarima_icc)[5]
-  mape_in_sample[2,"w_o_ICC"] <- summary(regarima_noicc)[5]
+  fore_h <- forecast(base_mod, xreg = new_xreg)
+  mat_rmse[k,"base_w_ICC"] <- sqrt((fore_h$mean - econ_test[1,"CONS"])^2)
+
+  training_forecasts[h, "base_w_ICC"] <- fore_h$mean
+  training_lower[h, "base_w_ICC"] <- fore_h$lower[,"95%"]
+  training_upper[h, "base_w_ICC"] <- fore_h$upper[,"95%"]
   
-  mase_in_sample <- matrix(NA, 2,2)
-  colnames(mase_in_sample) <- c("w_ICC", "w_o_ICC")
-  mase_in_sample[1,"w_ICC"] <- summary(base_mod)[6]
-  mase_in_sample[1,"w_o_ICC"] <- summary(base_mod_noicc)[6]
-  mase_in_sample[2,"w_ICC"] <- summary(regarima_icc)[6]
-  mase_in_sample[2,"w_o_ICC"] <- summary(regarima_noicc)[6]
+  new_xreg <- matrix(NA, 1, 2)
+  new_xreg[,c(1,2)] <- mat_outliers_test[1,]
+  colnames(new_xreg) <- colnames(mat_outliers_test)
   
-  # new_xreg <- cbind(ICC = df_icc_lags_test[,"ICC"],mat_outliers_test)
-  # fore_h <- forecast(base_mod, xreg = as.matrix(new_xreg))
-  # mat_rmse[k,1] <- 
-  #   sqrt(sum((fore_h$mean - econ_test[,"CONS"])^2,
-  #            na.rm = TRUE)) / length(fore_h$mean)
-  # 
-  # new_xreg <- mat_outliers_test
-  # predi_h <- predict(base_mod_noicc, newxreg = new_xreg)
-  # fore_h <- forecast(base_mod_noicc, xreg = new_xreg)
-  # mat_rmse[k,2] <- 
-  #   sqrt(sum((fore_h$mean - econ_test[,"CONS"])^2,
-  #            na.rm = TRUE)) / length(fore_h$mean)
-  # 
-  # new_xreg <- cbind(mat_outliers_test,
-  #                 ICC = df_icc_lags_test[,"ICC"],
-  #                 var_aux_test[,c("TD_O","INF_ANU","spread")])
-  # fore_h <- forecast(regarima_icc, xreg = as.matrix(new_xreg))
-  # mat_rmse[k,3] <- 
-  #   sqrt(sum((fore_h$mean - econ_test[,"CONS"])^2,
-  #            na.rm = TRUE)) / length(fore_h$mean)
-  # 
-  # new_xreg <- cbind(mat_outliers_test,
-  #                   var_aux_test[,c("TD_O","INF_ANU","spread")])
-  # fore_h <- forecast(regarima_noicc, xreg = as.matrix(new_xreg))
-  # mat_rmse[k,4] <- 
-  #   sqrt(sum((fore_h$mean - econ_test[,"CONS"])^2,
-  #            na.rm = TRUE)) / length(fore_h$mean)
-  # 
-  summary_list[[k]] <- list(RMSE = rmse_in_sample, 
-                            MAPE = mape_in_sample,
-                            MASE = mase_in_sample)
+  fore_h <- forecast(base_mod_noicc, xreg = new_xreg)
+  mat_rmse[k,"base_w_o_ICC"] <- sqrt((fore_h$mean - econ_test[1,"CONS"])^2)
+
+  training_forecasts[h, "base_w_o_ICC"] <- fore_h$mean
+  training_lower[h, "base_w_o_ICC"] <- fore_h$lower[,"95%"]
+  training_upper[h, "base_w_o_ICC"] <- fore_h$upper[,"95%"]
+  
+  new_xreg <- matrix(NA, 1, 6)
+  new_xreg[,c(1,2)] <- mat_outliers_test[1,]
+  new_xreg[,3] <- df_icc_lags_test[1,"ICC"]
+  new_xreg[,c(4:6)] <- unlist(var_aux_test[1,c("TD_O","INF_ANU","spread")])
+  colnames(new_xreg) <- c(colnames(mat_outliers_test), "ICC", 
+                          "TD_O","INF_ANU","spread")
+  
+  fore_h <- forecast(regarima_icc, xreg = new_xreg)
+  mat_rmse[k,"regarima_w_ICC"] <- 
+    sqrt((fore_h$mean - econ_test[1,"CONS"])^2)
+
+  training_forecasts[h, "regarima_w_ICC"] <- fore_h$mean
+  training_lower[h, "regarima_w_ICC"] <- fore_h$lower[,"95%"]
+  training_upper[h, "regarima_w_ICC"] <- fore_h$upper[,"95%"]
+  
+  new_xreg <- matrix(NA, 1, 5)
+  new_xreg[,c(1,2)] <- mat_outliers_test[1,]
+  new_xreg[,c(3:5)] <- unlist(var_aux_test[1,c("TD_O","INF_ANU","spread")])
+  colnames(new_xreg) <- c(colnames(mat_outliers_test),  
+                          "TD_O","INF_ANU","spread")
+  
+  new_xreg <- cbind(mat_outliers_test,
+                    var_aux_test[,c("TD_O","INF_ANU","spread")])
+  fore_h <- forecast(regarima_noicc, xreg = (as.matrix(new_xreg[1,])))
+  mat_rmse[k,"regarima_w_o_ICC"] <- 
+    sqrt((fore_h$mean - econ_test[1,"CONS"])^2)
+
+  training_forecasts[h, "regarima_w_o_ICC"] <- fore_h$mean
+  training_lower[h, "regarima_w_o_ICC"] <- fore_h$lower[,"95%"]
+  training_upper[h, "regarima_w_o_ICC"] <- fore_h$upper[,"95%"]
+  
   k <- k + 1
   
 }
+
+
+rmse_models <- apply(mat_rmse, 2, 
+       function (x) sum(x, na.rm = TRUE) / sum(!is.na(x)== TRUE))
+
+# figure8
+par(mfrow = c(1,1))
+barplot(rmse_models, beside = TRUE, 
+        col = gray.colors(4))
+
+# figure 9 
+par(mfrow = c(1,1), mai = c(.5,.5,.8,.5), xpd = TRUE)
+ts.plot(mat_rmse, xlab = "Forecast horizon", 
+        ylab = "RMSE", col = c(4,2,3,1),
+        lty = c(1,2,1,2), lwd = c(1,2,1,2))
+legend(x = 1, y = 0.027, legend = colnames(mat_rmse),
+         bty = "n",
+       col = c(4,2,3,1), horiz = TRUE, cex = 0.7,
+       lty = c(1,2,1,2), lwd = c(1,2,1,2))
+
+
+# figure 10
+par(mfrow = c(2,2), mai = c(.5, .5, .5,.5))
+# m1
+ts.plot(ts(econ_dl[,"CONS"], frequency = 12,start = ts_econ_start), 
+        ylab = "", xlab = "", col = c(4,2),
+        main = "CONS con ICC")
+    #ylim = c(min(c(fcst1$pred - 1.96*fcst1$se,econ_dl[,"CONS"]), na.rm = TRUE),
+     #            max(fcst1$pred + 1.96*fcst1$se)))
+lines(ts(c(rep(NA, nrow(econ_dl)-H), training_forecasts[,"base_w_ICC"]),
+         frequency = 12, start = ts_econ_start), col = 2, lwd = 2)
+lines(ts(c(rep(NA, nrow(econ_dl)-H),  training_lower[,"base_w_ICC"]),
+         frequency = 12, start = ts_econ_start), col = "lightblue", lwd = 2)
+lines(ts(c(rep(NA, nrow(econ_dl)-H),  training_upper[,"base_w_ICC"]),
+         frequency = 12, start = ts_econ_start), col = "lightblue", lwd = 2)
+#m2
+ts.plot(ts(econ_dl[,"CONS"], frequency = 12,start = ts_econ_start), 
+        ylab = "", xlab = "", col = c(4,2),
+        main = "CONS sin ICC")
+#ylim = c(min(c(fcst1$pred - 1.96*fcst1$se,econ_dl[,"CONS"]), na.rm = TRUE),
+#            max(fcst1$pred + 1.96*fcst1$se)))
+lines(ts(c(rep(NA, nrow(econ_dl)-H), training_forecasts[, "base_w_o_ICC"]),
+         frequency = 12, start = ts_econ_start), col = 2, lwd = 2)
+lines(ts(c(rep(NA, nrow(econ_dl)-H),  training_lower[,"base_w_o_ICC"]),
+         frequency = 12, start = ts_econ_start), col = "lightblue", lwd = 2)
+lines(ts(c(rep(NA, nrow(econ_dl)-H),  training_upper[,"base_w_o_ICC"]),
+         frequency = 12, start = ts_econ_start), col = "lightblue", lwd = 2)
+# m3
+ts.plot(ts(econ_dl[,"CONS"], frequency = 12,start = ts_econ_start), 
+        ylab = "", xlab = "", col = c(4,2),
+        main = "RegARIMA con ICC")
+#ylim = c(min(c(fcst1$pred - 1.96*fcst1$se,econ_dl[,"CONS"]), na.rm = TRUE),
+#            max(fcst1$pred + 1.96*fcst1$se)))
+lines(ts(c(rep(NA, nrow(econ_dl)-H), training_forecasts[,"regarima_w_ICC"]),
+         frequency = 12, start = ts_econ_start), col = 2, lwd = 2)
+lines(ts(c(rep(NA, nrow(econ_dl)-H),  training_lower[,"regarima_w_ICC"]),
+         frequency = 12, start = ts_econ_start), col = "lightblue", lwd = 2)
+lines(ts(c(rep(NA, nrow(econ_dl)-H),  training_upper[,"regarima_w_ICC"]),
+         frequency = 12, start = ts_econ_start), col = "lightblue", lwd = 2)
+#m4
+ts.plot(ts(econ_dl[,"CONS"], frequency = 12,start = ts_econ_start), 
+        ylab = "", xlab = "", col = c(4,2),
+        main = "RegARIMA sin ICC")
+#ylim = c(min(c(fcst1$pred - 1.96*fcst1$se,econ_dl[,"CONS"]), na.rm = TRUE),
+#            max(fcst1$pred + 1.96*fcst1$se)))
+lines(ts(c(rep(NA, nrow(econ_dl)-H), training_forecasts[,"regarima_w_o_ICC"]),
+         frequency = 12, start = ts_econ_start), col = 2, lwd = 2)
+lines(ts(c(rep(NA, nrow(econ_dl)-H),  training_lower[,"regarima_w_o_ICC"]),
+         frequency = 12, start = ts_econ_start), col = "lightblue", lwd = 2)
+lines(ts(c(rep(NA, nrow(econ_dl)-H),  training_upper[,"regarima_w_o_ICC"]),
+         frequency = 12, start = ts_econ_start), col = "lightblue", lwd = 2)
+
+
+
+par(mfrow = c(4,1))
+apply(mat_rmse, 2, 
+      function(x) ts.plot(x, xlab = "Forecast horizon", 
+                          ylab = "RMSE"))
+
+par(mfrow = c(1,1), mai = c(.5,.5,.8,.5), xpd = TRUE)
+ts.plot(mat_rmse, xlab = "Forecast horizon", 
+        ylab = "RMSE", col = c(4,2,3,1),
+        lty = c(1,2,1,2), lwd = c(1,2,1,2))
+legend(x = 1, y = 0.0055, legend = c("base_icc", "base_no_icc", 
+          "regarima_icc","regarima_icc_noicc"), bty = "n",
+       col = c(4,2,3,1), horiz = TRUE, cex = 0.7,
+       lty = c(1,2,1,2), lwd = c(1,2,1,2))
 
 mat_rmse2 <- mat_mape2 <- mat_mase2  <- matrix(0,24,4)
 colnames(mat_rmse2) <- colnames(mat_mape2) <- 
