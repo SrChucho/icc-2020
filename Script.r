@@ -235,6 +235,7 @@ row.names(econ_dl) <-
 
 sed <- 1-det(cor(econ_dl, use = "complete.obs"))^(1/(ncol(econ_dl)-1))
 # including sav   0.8227016 #2020/07/02
+# including sav   0.8693612 #2020/07/14
 # witout sav   0.5026158
 
 # imput NA's with pca
@@ -306,12 +307,17 @@ Acf(diff(diff(econ_dl[, "CONS"])))
 Acf(diff(diff(econ_dl[, "CONS"])), type = "partial")
 Acf(diff(diff(econ_dl[, "CONS"])), plot = FALSE)
 
-# modelacion de outliers consumo
-mx13 <- seas(ts(econ_dl[-is.na(econ_dl[,"CONS"]),"CONS"], 
-                frequency = 12, start = ts_econ_start))
 # figure 11
 par(mfrow = c(1,1))
+ts.plot(ts(econ_dl[-is.na(econ_dl[,"CONS"]),"CONS"], 
+   frequency = 12, start = c(2004,1)), 
+   col = "red", lwd = 2, ylab = "")
+   
+# modelacion de outliers consumo
+mx13 <- seas(ts(econ_dl[-is.na(econ_dl[,"CONS"]),"CONS"], 
+                frequency = 12, start = c(2004,1)))
 plot(mx13)
+cons_s11 <- series(mx13, "s11")
 
 x13_vars <- mx13$model$regression$variables
  if(any(grep("easter",x13_vars))){
@@ -406,7 +412,7 @@ H <- 24
 mat_rmse <- matrix(NA, H, 4)
 colnames(mat_rmse) <- c("base_w_ICC","base_w_o_ICC",
                         "regarima_w_ICC", "regarima_w_o_ICC")
-row.names(mat_rmse) <- row.names(econ_dl)[(nrow(econ_dl)-H):nrow(econ_dl)]
+row.names(mat_rmse) <- row.names(econ_dl)[(nrow(econ_dl)-H + 1):nrow(econ_dl)]
 summary_list <- list()
 
 training_forecasts <- training_lower <- training_upper <- 
@@ -417,7 +423,7 @@ colnames(training_forecasts) <- colnames(training_lower) <-
 
 k <- 1
 
-for(h in 1:H){ # h <- 23; print(h)
+for(h in 1:H){ # h <- 24; print(h)
   
   # recortamos las variables de acuerdo a h
   # periodo de entrenamiento
@@ -566,7 +572,6 @@ for(h in 1:H){ # h <- 23; print(h)
   
 }
 
-
 rmse_models <- apply(mat_rmse, 2, 
        function (x) sum(x, na.rm = TRUE) / sum(!is.na(x)== TRUE))
 
@@ -576,13 +581,14 @@ barplot(rmse_models, beside = TRUE,
         col = gray.colors(4))
 
 # figure 9 
-par(mfrow = c(1,1), mai = c(.5,.5,.8,.5), xpd = TRUE)
+par(mfrow = c(1,1), mai = c(.5,.5,.8,1.5), xpd = TRUE)
 ts.plot(mat_rmse, xlab = "Forecast horizon", 
         ylab = "RMSE", col = c(4,2,3,1),
         lty = c(1,2,1,2), lwd = c(1,2,1,2))
-legend(x = 1, y = 0.027, legend = colnames(mat_rmse),
+legend(x = 25, y = max(mat_rmse, na.rm = TRUE) , 
+       legend = colnames(mat_rmse),
          bty = "n",
-       col = c(4,2,3,1), horiz = TRUE, cex = 0.7,
+       col = c(4,2,3,1), cex = 0.7,
        lty = c(1,2,1,2), lwd = c(1,2,1,2))
 
 
@@ -639,502 +645,7 @@ lines(ts(c(rep(NA, nrow(econ_dl)-H),  training_upper[,"regarima_w_o_ICC"]),
 
 
 
-par(mfrow = c(4,1))
-apply(mat_rmse, 2, 
-      function(x) ts.plot(x, xlab = "Forecast horizon", 
-                          ylab = "RMSE"))
 
-par(mfrow = c(1,1), mai = c(.5,.5,.8,.5), xpd = TRUE)
-ts.plot(mat_rmse, xlab = "Forecast horizon", 
-        ylab = "RMSE", col = c(4,2,3,1),
-        lty = c(1,2,1,2), lwd = c(1,2,1,2))
-legend(x = 1, y = 0.0055, legend = c("base_icc", "base_no_icc", 
-          "regarima_icc","regarima_icc_noicc"), bty = "n",
-       col = c(4,2,3,1), horiz = TRUE, cex = 0.7,
-       lty = c(1,2,1,2), lwd = c(1,2,1,2))
-
-mat_rmse2 <- mat_mape2 <- mat_mase2  <- matrix(0,24,4)
-colnames(mat_rmse2) <- colnames(mat_mape2) <- 
-  colnames(mat_mase2) <- c("base_icc", "base_no_icc", 
-                     "regarima_icc","regarima_icc_noicc")
-for(j in 1:length(summary_list)){
-  list_temp <- summary_list[[j]]
-  mat_rmse2[j, c(1,2)] <- list_temp$RMSE[1,]
-  mat_rmse2[j, c(3,4)] <- list_temp$RMSE[2,]
-  mat_mape2[j, c(1,2)] <- list_temp$MAPE[1,]
-  mat_mape2[j, c(3,4)] <- list_temp$MAPE[2,]
-  mat_mase2[j, c(1,2)] <- list_temp$MASE[1,]
-  mat_mase2[j, c(3,4)] <- list_temp$MASE[2,]
-}
-
-par(mfrow = c(3,1), mai = c(1,1,.5, 3), xpd = TRUE)
-ts.plot(mat_rmse2, col = c(4,2,3,1), 
-        xlab = "Forecast horizon", ylab = "RMSE")
-legend(x = 25,y = .0112,
-  legend = c("base_icc", "base_no_icc", 
-                     "regarima_icc","regarima_icc_noicc"),
-       bty = "n", lty = 1, col = c(4,2,3,1))
-ts.plot(mat_mape2, col = c(4,2,3,1), 
-        xlab = "Forecast horizon", ylab = "MAPE")
-legend(x = 25,y = 57,
-       legend = c("base_icc", "base_no_icc", 
-                  "regarima_icc","regarima_icc_noicc"),
-       bty = "n", lty = 1, col = c(4,2,3,1))
-ts.plot(mat_mase2, col = c(4,2,3,1), 
-        xlab = "Forecast horizon", ylab = "MASE")
-legend(x = 25,y = .9,
-       legend = c("base_icc", "base_no_icc", 
-                  "regarima_icc","regarima_icc_noicc"),
-       bty = "n", lty = 1, col = c(4,2,3,1))
-
-
-
-
-par(mfrow = c(3,1))
-barplot(mat_h[,"rmse"], 
-        beside = TRUE, main = "RMSE out of sample")
-barplot(mat_h[,"mape"], 
-        beside = TRUE, main = "MAPE out of sample")
-barplot(mat_h[,"mase"],
-        beside = TRUE, main = "MASE out of sample")
-
-
-par(mfrow = c(3,1))
-barplot(rmse_naive, beside = TRUE, main = "RMSE",
-        legend.text = c("ICC", "ICC-lag1", "ICC-lag12"), 
-        args.legend = list(x = 6, y =0.06,horiz = TRUE, 
-                           bty = "n"))
-barplot(mape_naive, beside = TRUE, main = "MAPE",
-        legend.text = c("ICC", "ICC-lag1", "ICC-lag12"), 
-        args.legend = list(x = 6, y =0.06,horiz = TRUE, 
-                           bty = "n"))
-barplot(mase_naive, beside = TRUE, main = "MASE",
-        legend.text = c("ICC", "ICC-lag1", "ICC-lag12"), 
-        args.legend = list(x = 6, y =0.06,horiz = TRUE, 
-                           bty = "n"))
-
-
-
-AIC(naive_icc, naive_noicc)
-AIC(naive_icc_lag1, naive_lag1_noicc)
-AIC(naive_icc_lag12, naive_lag12_noicc)
-
-BIC(naive_icc, naive_noicc)
-BIC(naive_icc_lag1, naive_lag1_noicc)
-BIC(naive_icc_lag12, naive_lag12_noicc)
-
-par(mfrow = c(3,2))
-Acf(resid(naive_icc))
-Acf(resid(naive_noicc))
-Acf(resid(naive_icc_lag1))
-Acf(resid(naive_lag1_noicc))
-Acf(resid(naive_icc_lag12))
-Acf(resid(naive_lag12_noicc))
-
-par(mfrow = c(3,2))
-plot(density(resid(naive_icc)))
-plot(density(resid(naive_noicc)))
-plot(density(resid(naive_icc_lag1), na.rm = TRUE))
-plot(density(resid(naive_lag1_noicc), na.rm = TRUE))
-plot(density(resid(naive_icc_lag12), na.rm = TRUE))
-plot(density(resid(naive_lag12_noicc), na.rm = TRUE))
-
-Box.test(resid(naive_icc), type = "Ljung-Box")
-Box.test(resid(naive_noicc), type = "Ljung-Box")
-Box.test(resid(naive_icc_lag1), type = "Ljung-Box")
-Box.test(resid(naive_lag1_noicc), type = "Ljung-Box")
-Box.test(resid(naive_icc_lag12), type = "Ljung-Box")
-Box.test(resid(naive_lag12_noicc), type = "Ljung-Box")
-
-# pronosticos 1
-
-m1 <- naive_icc
-m2 <- naive_noicc
-m3 <- naive_icc_lag1
-m4 <- naive_lag1_noicc
-m5 <- naive_icc_lag12
-m6 <- naive_lag12_noicc
-
-
-fcst1 <- predict(m1, h, 
-                 newxreg = cbind(df_icc_lags_test[,"ICC"], 
-                                 mat_outliers_test))
-fcst2 <- predict(m2, h, 
-                 newxreg = cbind(mat_outliers_test))
-fcst3 <- predict(m3, h, 
-                 newxreg = cbind(df_icc_lags_test[,"ICC_lag1"],
-                                 mat_outliers_test))
-fcst4 <- predict(m4, h, 
-                 newxreg = cbind(mat_outliers_test))
-fcst5 <- predict(m5, h, 
-                 newxreg = cbind(df_icc_lags_test[,"ICC_lag12"],
-                                 mat_outliers_test))
-fcst6 <- predict(m6, h, 
-                 newxreg = cbind(mat_outliers_test))
-
-
-ts_start <- start(m1$x)
-
-par(mfrow = c(3,2), mai = c(.5, .5, .5,.5))
-# m1
-ts.plot(ts(cbind(econ_dl[,"CONS"],c(fitted(m1),rep(NA,h))), 
-           frequency = 12,start = ts_start), 
-        ylab = "", xlab = "", col = c(4,2),
-        main = "CONS con ICC",
-        ylim = c(min(c(fcst1$pred - 1.96*fcst1$se,econ_dl[,"CONS"]), na.rm = TRUE),
-                 max(fcst1$pred + 1.96*fcst1$se)))
-lines(ts(c(rep(NA, nrow(econ_dl)-h), fcst1$pred),
-         frequency = 12, start = ts_start), col = 2, lwd = 2)
-lines(ts(c(rep(NA, nrow(econ_dl)-h), fcst1$pred - 1.96*fcst1$se),
-         frequency = 12, start = ts_start), col = "lightblue", lwd = 2)
-lines(ts(c(rep(NA, nrow(econ_dl)-h), fcst1$pred + 1.96*fcst1$se),
-         frequency = 12, start = ts_start), col = "lightblue", lwd = 2)
-# m2
-ts.plot(ts(cbind(econ_dl[,"CONS"],c(fitted(m2),rep(NA,h))), 
-           frequency = 12,start = ts_start), 
-        ylab = "", xlab = "", col = c(4, 2),
-        main = "CONS sin ICC",
-        ylim = c(min(c(fcst2$pred - 1.96*fcst2$se,econ_dl[,"CONS"]), na.rm = TRUE),
-                 max(fcst2$pred + 1.96*fcst2$se)))
-lines(ts(c(rep(NA, nrow(econ_dl)-h), fcst2$pred),
-         frequency = 12, start = ts_start), col = 2, lwd = 2)
-lines(ts(c(rep(NA, nrow(econ_dl)-h), fcst2$pred - 1.96*fcst2$se),
-         frequency = 12, start = ts_start), col = "lightblue", lwd = 2)
-lines(ts(c(rep(NA, nrow(econ_dl)-h), fcst2$pred + 1.96*fcst2$se),
-         frequency = 12, start = ts_start), col = "lightblue", lwd = 2)
-# m3
-ts.plot(ts(cbind(econ_dl[,"CONS"],c(fitted(m3),rep(NA,h))), 
-           frequency = 12, start = ts_start), 
-        ylab = "", xlab = "", col = c(4,2), 
-        main = "CONS con ICC lag1",
-        ylim = c(min(c(fcst3$pred - 1.96*fcst3$se, econ_dl[,"CONS"]), na.rm = TRUE),
-                 max(fcst3$pred + 1.96*fcst3$se)))
-lines(ts(c(rep(NA, nrow(econ_dl)-h), fcst3$pred),
-         frequency = 12, start = ts_start), col = 2, lwd = 2)
-lines(ts(c(rep(NA, nrow(econ_dl)-h), fcst3$pred - 1.96*fcst3$se),
-         frequency = 12, start = ts_start), col = "lightblue", lwd = 2)
-lines(ts(c(rep(NA, nrow(econ_dl)-h), fcst3$pred + 1.96*fcst3$se),
-         frequency = 12, start = ts_start), col = "lightblue", lwd = 2)
-# m4
-ts.plot(ts(cbind(econ_dl[,"CONS"],c(fitted(m4),rep(NA,h))), 
-           frequency = 12, start = ts_start), 
-        ylab = "", xlab = "", col = c(4,2), 
-        main = "CONS sin ICC lag 1",
-        ylim = c(min(c(fcst4$pred - 1.96*fcst4$se, econ_dl[,"CONS"]), na.rm = TRUE),
-                 max(fcst4$pred + 1.96*fcst4$se)))
-lines(ts(c(rep(NA, nrow(econ_dl)-h), fcst4$pred),
-         frequency = 12, start = ts_start), col = 2, lwd = 2)
-lines(ts(c(rep(NA, nrow(econ_dl)-h), fcst4$pred - 1.96*fcst4$se),
-         frequency = 12, start = ts_start), col = "lightblue", lwd = 2)
-lines(ts(c(rep(NA, nrow(econ_dl)-h), fcst4$pred + 1.96*fcst4$se),
-         frequency = 12, start = ts_start), col = "lightblue", lwd = 2)
-# m5
-ts.plot(ts(cbind(econ_dl[,"CONS"],c(fitted(m5),rep(NA,h))), 
-           frequency = 12, start = ts_start), 
-        ylab = "", xlab = "", col = c(4,2), 
-        main = "naive con ICC lag12",
-        ylim = c(min(c(fcst5$pred - 1.96*fcst5$se, econ_dl[,"CONS"]), na.rm = TRUE),
-                 max(fcst5$pred + 1.96*fcst5$se)))
-lines(ts(c(rep(NA, nrow(econ_dl)-h), fcst5$pred),
-         frequency = 12, start = ts_start), col = 2, lwd = 2)
-lines(ts(c(rep(NA, nrow(econ_dl)-h), fcst5$pred - 1.96*fcst5$se),
-         frequency = 12, start = ts_start), col = "lightblue", lwd = 2)
-lines(ts(c(rep(NA, nrow(econ_dl)-h), fcst5$pred + 1.96*fcst5$se),
-         frequency = 12, start = ts_start), col = "lightblue", lwd = 2)
-# m6
-ts.plot(ts(cbind(econ_dl[,"CONS"],c(fitted(m6),rep(NA,h))), 
-           frequency = 12, start = ts_start), 
-        ylab = "", xlab = "", col = c(4,2), 
-        main = "naive lag12 sin ICC",
-        ylim = c(min(c(fcst6$pred - 1.96*fcst6$se, econ_dl[,"CONS"]), na.rm = TRUE),
-                 max(fcst6$pred + 1.96*fcst6$se)))
-lines(ts(c(rep(NA, nrow(econ_dl)-h), fcst6$pred),
-         frequency = 12, start = ts_start), col = 2, lwd = 2)
-lines(ts(c(rep(NA, nrow(econ_dl)-h), fcst6$pred - 1.96*fcst6$se),
-         frequency = 12, start = ts_start), col = "lightblue", lwd = 2)
-lines(ts(c(rep(NA, nrow(econ_dl)-h), fcst6$pred + 1.96*fcst6$se),
-         frequency = 12, start = ts_start), col = "lightblue", lwd = 2)
-
-
-
-## 2
-# full autoarima con variables auxiliares e ICC
-naive_plus_icc <- 
-  auto.arima(ts(econ_training[,"CONS"],frequency = 12,
-      start = c(as.numeric(substr(row.names(econ_training)[1],1,4)),
-      as.numeric(substr(row.names(econ_training)[1], 6,7))) ),
-    xreg = ts(cbind(mat_outliers_training,
-       df_icc_lags_training[,"ICC"],
-       var_aux_training[,c("TD_O","INF_ANU","spread")]),
-      frequency = 12,
-       start = c(as.numeric(substr(row.names(econ_training)[1],1,4)),
-       as.numeric(substr(row.names(econ_training)[1], 6,7))) ) )
-
-# arima variables auxiliares quitando el ICC
-naive_plus_noicc <- arima(ts(econ_training[,"CONS"],frequency = 12,
-       start = c(as.numeric(substr(row.names(econ_training)[1],1,4)),
-       as.numeric(substr(row.names(econ_training)[1], 6,7))) ),
-      order = c(naive_plus_icc$arma[1],naive_plus_icc$arma[6],
-                naive_plus_icc$arma[2]),
-        seasonal = list(order = c(naive_plus_icc$arma[3],
-                naive_plus_icc$arma[7],naive_plus_icc$arma[4]),
-        period = naive_plus_icc$arma[5]),
-      xreg = ts(cbind(mat_outliers_training,
-        var_aux_training[,c("TD_O","INF_ANU","spread")]),
-      frequency = 12,
-        start = c(as.numeric(substr(row.names(econ_training)[1],1,4)),
-        as.numeric(substr(row.names(econ_training)[1], 6,7))) ) )
-
-# autoarima con variables auxiliares e ICC lag1
-naive_plus_icc_lag1 <- auto.arima(ts(econ_training[,"CONS"],frequency = 12,
-        start = c(as.numeric(substr(row.names(econ_training)[1],1,4)),
-        as.numeric(substr(row.names(econ_training)[1], 6,7))) ),
-      xreg = ts(cbind(mat_outliers_training,
-        df_icc_lags_training[,"ICC_lag1"],
-        var_aux_training[,c("TD_O","INF_ANU","spread")]),
-      frequency = 12,
-        start = c(as.numeric(substr(row.names(econ_training)[1],1,4)),
-        as.numeric(substr(row.names(econ_training)[1], 6,7))) ) )
-
-# autoarima con variables auxiliares e ICC lag1 quitando el ICC
-naive_plus_lag1_noicc <- arima(ts(econ_training[,"CONS"],frequency = 12,
-        start = c(as.numeric(substr(row.names(econ_training)[1],1,4)),
-        as.numeric(substr(row.names(econ_training)[1], 6,7))) ),
-      order = c(naive_plus_icc_lag1$arma[1],
-                naive_plus_icc_lag1$arma[6],naive_plus_icc_lag1$arma[2]),
-        seasonal = list(order = c(naive_plus_icc_lag1$arma[3],
-                naive_plus_icc_lag1$arma[7],naive_plus_icc_lag1$arma[4]),
-                period = naive_plus_icc_lag1$arma[5]),
-      xreg = ts(cbind(mat_outliers_training,
-        var_aux_training[,c("TD_O","INF_ANU","spread")]),
-      frequency = 12,
-        start = c(as.numeric(substr(row.names(econ_training)[1],1,4)),
-        as.numeric(substr(row.names(econ_training)[1], 6,7))) ) )
-
-# arima con variables auxiliares e ICC lag 12
-naive_plus_icc_lag12 <- auto.arima(ts(econ_training[,"CONS"],frequency = 12,
-        start = c(as.numeric(substr(row.names(econ_training)[1],1,4)),
-        as.numeric(substr(row.names(econ_training)[1], 6,7))) ),
-      xreg = ts(cbind(mat_outliers_training,
-        df_icc_lags_training[,"ICC_lag12"],
-        var_aux_training[,c("TD_O","INF_ANU","spread")]),
-      frequency = 12,
-        start = c(as.numeric(substr(row.names(econ_training)[1],1,4)),
-        as.numeric(substr(row.names(econ_training)[1], 6,7))) ) )
-
-# arima con variables auxiliares e ICC lag 12 quitando ICC
-naive_plus_lag12_noicc <- arima(ts(econ_training[,"CONS"],frequency = 12,
-        start = c(as.numeric(substr(row.names(econ_training)[1],1,4)),
-        as.numeric(substr(row.names(econ_training)[1], 6,7))) ),
-      order = c(naive_plus_icc_lag12$arma[1],naive_plus_icc_lag12$arma[6],
-                naive_plus_icc_lag12$arma[2]),
-      seasonal = list(order = c(naive_plus_icc_lag12$arma[3],
-                naive_plus_icc_lag12$arma[7],naive_plus_icc_lag12$arma[4]),
-        period = naive_plus_icc_lag12$arma[5]),
-      xreg = ts(cbind(mat_outliers_training,
-        var_aux_training[,c("TD_O","INF_ANU","spread")]),
-      frequency = 12,
-        start = c(as.numeric(substr(row.names(econ_training)[1],1,4)),
-        as.numeric(substr(row.names(econ_training)[1], 6,7))) ) )
-
-summary(naive_plus_icc)
-summary(naive_plus_noicc)
-summary(naive_plus_icc_lag1)
-summary(naive_plus_lag1_noicc)
-summary(naive_plus_icc_lag12)
-summary(naive_plus_lag12_noicc)
-
-rmse_plus <- matrix(NA, 3,2)
-colnames(rmse_plus) <- c("w_ICC", "w_o_ICC")
-row.names(rmse_plus) <- c("ICC", "ICC-lag1", "ICC-lag12")
-rmse_plus[1,"w_ICC"] <- summary(naive_plus_icc)[2]
-rmse_plus[1,"w_o_ICC"] <- summary(naive_plus_noicc)[2]
-rmse_plus[2,"w_ICC"] <- summary(naive_plus_icc_lag1)[2]
-rmse_plus[2,"w_o_ICC"] <- summary(naive_plus_lag1_noicc)[2]
-rmse_plus[3,"w_ICC"] <- summary(naive_plus_icc_lag12)[2]
-rmse_plus[3,"w_o_ICC"] <- summary(naive_plus_lag12_noicc)[2]
-
-
-mape_plus <- matrix(NA, 3,2)
-colnames(mape_plus) <- c("w_ICC", "w_o_ICC")
-row.names(mape_plus) <- c("ICC", "ICC-lag1", "ICC-lag12")
-mape_plus[1,"w_ICC"] <- summary(naive_plus_icc)[5]
-mape_plus[1,"w_o_ICC"] <- summary(naive_plus_noicc)[5]
-mape_plus[2,"w_ICC"] <- summary(naive_plus_icc_lag1)[5]
-mape_plus[2,"w_o_ICC"] <- summary(naive_plus_lag1_noicc)[5]
-mape_plus[3,"w_ICC"] <- summary(naive_plus_icc_lag12)[5]
-mape_plus[3,"w_o_ICC"] <- summary(naive_plus_lag12_noicc)[5]
-
-mase_plus <- matrix(NA, 3,2)
-colnames(mase_plus) <- c("w_ICC", "w_o_ICC")
-row.names(mase_plus) <- c("ICC", "ICC-lag1", "ICC-lag12")
-mase_plus[1,"w_ICC"] <- summary(naive_plus_icc)[6]
-mase_plus[1,"w_o_ICC"] <- summary(naive_plus_noicc)[6]
-mase_plus[2,"w_ICC"] <- summary(naive_plus_icc_lag1)[6]
-mase_plus[2,"w_o_ICC"] <- summary(naive_plus_lag1_noicc)[6]
-mase_plus[3,"w_ICC"] <- summary(naive_plus_icc_lag12)[6]
-mase_plus[3,"w_o_ICC"] <- summary(naive_plus_lag12_noicc)[6]
-
-par(mfrow = c(3,1))
-barplot(rmse_plus, beside = TRUE, main = "RMSE", 
-        legend.text = c("ICC", "ICC-lag1", "ICC-lag12"), 
-        args.legend = list(x = 6, y =0.06,horiz = TRUE, 
-                           bty = "n"))
-barplot(mape_plus, beside = TRUE, main = "MAPE", 
-        legend.text = c("ICC", "ICC-lag1", "ICC-lag12"), 
-        args.legend = list(x = 6, y =0.06,horiz = TRUE, 
-                           bty = "n"))
-barplot(mase_plus, beside = TRUE, main = "MASE", 
-        legend.text = c("ICC", "ICC-lag1", "ICC-lag12"), 
-        args.legend = list(x = 6, y =0.06,horiz = TRUE, 
-                           bty = "n"))
-
-
-AIC(naive_plus_icc, naive_plus_noicc)
-AIC(naive_plus_icc_lag1, naive_plus_lag1_noicc)
-AIC(naive_plus_icc_lag12, naive_plus_lag12_noicc)
-
-BIC(naive_plus_icc, naive_plus_noicc)
-BIC(naive_plus_icc_lag1, naive_plus_lag1_noicc)
-BIC(naive_plus_icc_lag12, naive_plus_lag12_noicc)
-
-
-par(mfrow = c(3,2))
-Acf(resid(naive_plus_icc))
-Acf(resid(naive_plus_noicc))
-Acf(resid(naive_plus_icc_lag1))
-Acf(resid(naive_plus_lag1_noicc))
-Acf(resid(naive_plus_icc_lag12))
-Acf(resid(naive_plus_lag12_noicc))
-
-par(mfrow = c(3,2))
-plot(density(resid(naive_plus_icc), na.rm = TRUE))
-plot(density(resid(naive_plus_noicc), na.rm = TRUE))
-plot(density(resid(naive_plus_icc_lag1), na.rm = TRUE))
-plot(density(resid(naive_plus_lag1_noicc), na.rm = TRUE))
-plot(density(resid(naive_plus_icc_lag12), na.rm = TRUE))
-plot(density(resid(naive_plus_lag12_noicc), na.rm = TRUE))
-
-Box.test(resid(naive_plus_icc), type = "Ljung-Box")
-Box.test(resid(naive_plus_noicc), type = "Ljung-Box")
-Box.test(resid(naive_plus_icc_lag1), type = "Ljung-Box")
-Box.test(resid(naive_plus_lag1_noicc), type = "Ljung-Box")
-Box.test(resid(naive_plus_icc_lag12), type = "Ljung-Box")
-Box.test(resid(naive_plus_lag12_noicc), type = "Ljung-Box")
-
-
-# pronosticos 2
-
-m1 <- naive_plus_icc
-m2 <- naive_plus_noicc
-m3 <- naive_plus_icc_lag1
-m4 <- naive_plus_lag1_noicc
-m5 <- naive_plus_icc_lag12
-m6 <- naive_plus_lag12_noicc
-
-
-fcst1 <- predict(m1, H, 
-           newxreg = cbind(df_icc_lags_test[,"ICC"], 
-                           mat_outliers_test))
-fcst2 <- predict(m2, H, 
-           newxreg = cbind(mat_outliers_test))
-fcst3 <- predict(m3, H, 
-          newxreg = cbind(df_icc_lags_test[,"ICC_lag1"],
-                          mat_outliers_test))
-fcst4 <- predict(m4, H, 
-          newxreg = cbind(mat_outliers_test))
-fcst5 <- predict(m5, H, 
-          newxreg = cbind(df_icc_lags_test[,"ICC_lag12"],
-                                 mat_outliers_test))
-fcst6 <- predict(m6, H, 
-          newxreg = cbind(mat_outliers_test))
-
-
-ts_start <- start(m1$x)
-  
-par(mfrow = c(3,2), mai = c(.5, .5, .5,.5))
-# m1
-ts.plot(ts(cbind(econ_dl[,"CONS"],c(fitted(m1),rep(NA,H))), 
-           frequency = 12,start = ts_start), 
-        ylab = "", xlab = "", col = c(4,2),
-        main = "naive + TD + INF + SPREAD  + ICC",
-        ylim = c(min(c(fcst1$pred - 1.96*fcst1$se,econ_dl[,"CONS"]), na.rm = TRUE),
-                 max(fcst1$pred + 1.96*fcst1$se)))
-lines(ts(c(rep(NA, nrow(econ_dl)-H), fcst1$pred),
-         frequency = 12, start = ts_start), col = 2, lwd = 2)
-lines(ts(c(rep(NA, nrow(econ_dl)-H), fcst1$pred - 1.96*fcst1$se),
-         frequency = 12, start = ts_start), col = "lightblue", lwd = 2)
-lines(ts(c(rep(NA, nrow(econ_dl)-H), fcst1$pred + 1.96*fcst1$se),
-         frequency = 12, start = ts_start), col = "lightblue", lwd = 2)
-# m2
-ts.plot(ts(cbind(econ_dl[,"CONS"],c(fitted(m2),rep(NA,H))), 
-           frequency = 12,start = ts_start), 
-        ylab = "", xlab = "", col = c(4, 2),
-        main = "naive + TD + INF + SPREAD ",
-        ylim = c(min(c(fcst2$pred - 1.96*fcst2$se,econ_dl[,"CONS"]), na.rm = TRUE),
-                 max(fcst2$pred + 1.96*fcst2$se)))
-lines(ts(c(rep(NA, nrow(econ_dl)-H), fcst2$pred),
-         frequency = 12, start = ts_start), col = 2, lwd = 2)
-lines(ts(c(rep(NA, nrow(econ_dl)-H), fcst2$pred - 1.96*fcst2$se),
-         frequency = 12, start = ts_start), col = "lightblue", lwd = 2)
-lines(ts(c(rep(NA, nrow(econ_dl)-H), fcst2$pred + 1.96*fcst2$se),
-         frequency = 12, start = ts_start), col = "lightblue", lwd = 2)
-# m3
-ts.plot(ts(cbind(econ_dl[,"CONS"],c(fitted(m3),rep(NA,H))), 
-           frequency = 12, start = ts_start), 
-        ylab = "", xlab = "", col = c(4,2), 
-        main = "naive + TD + INF + SPREAD  + ICC lag 1",
-        ylim = c(min(c(fcst3$pred - 1.96*fcst3$se, econ_dl[,"CONS"]), na.rm = TRUE),
-                 max(fcst3$pred + 1.96*fcst3$se)))
-lines(ts(c(rep(NA, nrow(econ_dl)-H), fcst3$pred),
-         frequency = 12, start = ts_start), col = 2, lwd = 2)
-lines(ts(c(rep(NA, nrow(econ_dl)-H), fcst3$pred - 1.96*fcst3$se),
-         frequency = 12, start = ts_start), col = "lightblue", lwd = 2)
-lines(ts(c(rep(NA, nrow(econ_dl)-H), fcst3$pred + 1.96*fcst3$se),
-         frequency = 12, start = ts_start), col = "lightblue", lwd = 2)
-# m4
-ts.plot(ts(cbind(econ_dl[,"CONS"],c(fitted(m4),rep(NA,H))), 
-           frequency = 12, start = ts_start), 
-        ylab = "", xlab = "", col = c(4,2), 
-        main = "naive + TD + INF + SPREAD , sin ICC lag1 ",
-       ylim = c(min(c(fcst4$pred - 1.96*fcst4$se, econ_dl[,"CONS"]), na.rm = TRUE),
-                 max(fcst4$pred + 1.96*fcst4$se)))
-lines(ts(c(rep(NA, nrow(econ_dl)-H), fcst4$pred),
-         frequency = 12, start = ts_start), col = 2, lwd = 2)
-lines(ts(c(rep(NA, nrow(econ_dl)-H), fcst4$pred - 1.96*fcst4$se),
-         frequency = 12, start = ts_start), col = "lightblue", lwd = 2)
-lines(ts(c(rep(NA, nrow(econ_dl)-H), fcst4$pred + 1.96*fcst4$se),
-         frequency = 12, start = ts_start), col = "lightblue", lwd = 2)
-# m5
-ts.plot(ts(cbind(econ_dl[,"CONS"],c(fitted(m5),rep(NA,H))), 
-           frequency = 12, start = ts_start), 
-        ylab = "", xlab = "", col = c(4,2),
-        main = "naive + TD + INF + SPREAD  + ICC lag12",
-        ylim = c(min(c(fcst5$pred - 1.96*fcst5$se, econ_dl[,"CONS"]), na.rm = TRUE),
-                 max(fcst5$pred + 1.96*fcst5$se)))
-lines(ts(c(rep(NA, nrow(econ_dl)-H), fcst5$pred),
-         frequency = 12, start = ts_start), col = 2, lwd = 2)
-lines(ts(c(rep(NA, nrow(econ_dl)-H), fcst5$pred - 1.96*fcst5$se),
-         frequency = 12, start = ts_start), col = "lightblue", lwd = 2)
-lines(ts(c(rep(NA, nrow(econ_dl)-H), fcst5$pred + 1.96*fcst5$se),
-         frequency = 12, start = ts_start), col = "lightblue", lwd = 2)
-# m6
-ts.plot(ts(cbind(econ_dl[,"CONS"],c(fitted(m6),rep(NA,H))), 
-           frequency = 12, start = ts_start), 
-        ylab = "", xlab = "", col = c(4,2), 
-        main = "naive + TD + INF + SPREAD, sin ICC lag12",
-        ylim = c(min(c(fcst6$pred - 1.96*fcst6$se, econ_dl[,"CONS"]), na.rm = TRUE),
-                 max(fcst6$pred + 1.96*fcst6$se)))
-lines(ts(c(rep(NA, nrow(econ_dl)-H), fcst6$pred),
-         frequency = 12, start = ts_start), col = 2, lwd = 2)
-lines(ts(c(rep(NA, nrow(econ_dl)-H), fcst6$pred - 1.96*fcst6$se),
-         frequency = 12, start = ts_start), col = "lightblue", lwd = 2)
-lines(ts(c(rep(NA, nrow(econ_dl)-H), fcst6$pred + 1.96*fcst6$se),
-         frequency = 12, start = ts_start), col = "lightblue", lwd = 2)
-
-
-
-#
 ## Modelos CC y PLS
 #
 
@@ -1228,6 +739,6 @@ for(i in 1 : nrow(mat_models)){ print(i)
   }
 }
 
-save.image(paste(path, "icc-savf-iccDL.RData"))
+#save.image(paste(path, "icc-savf-iccDL.RData"))
 
 
