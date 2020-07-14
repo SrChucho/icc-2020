@@ -1,0 +1,11 @@
+Indicador ,arimamodel,transformation,td,lpyear,easter,AO,TC,LS,RP,seasonalma
+COMP_1,(0 1 1)(0 0 1),log,,,,AO2017.Jan,,,,s3x5
+COMP_2,(0 1 1)(1 0 0),log,,,,"AO2009.Apr,AO2009.Jul,AO2017.Jan,AO2017.Feb",,LS2018.Jul,,s3x5
+COMP_3,(0 1 1)(1 0 0),log,,,,"AO2004.May,AO2017.Jan",,,,s3x5
+COMP_4,(0 1 1)(0 0 1),log,,,,,,,,
+COMP_5,(0 1 1)(0 0 0),log,,,,,,,,
+COMP_6,(0 1 2)(0 0 0),log,,,,AO2017.Jan,,LS2018.Jul,,
+COMP_7,(0 1 [1 3])(0 0 0),log,,,,"AO2017.Jan,AO2017.Feb",,LS2018.Jul,,
+COMP_8,(0 1 [1 3])(0 0 0),log,,,,AO2017.Jan,TC2009.Feb,"LS2008.Oct,LS2018.Jul",,s3x5
+COMP_9,(0 1 1)(0 0 1),log,,,,,,,,s3x5
+COMP_10,(0 1 1 )(0 0 0),log,,,,AO2015.Jan,TC2013.Jul,,,

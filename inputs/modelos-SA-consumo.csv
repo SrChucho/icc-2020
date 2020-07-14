@@ -1,0 +1,6 @@
+Indicador ,arimamodel,transformation,td,lpyear,easter,AO,TC,LS,RP,seasonalma
+CONS,(0 1 1)(0 1 1),log,Tdnolpyear,lp,Easter[4],"AO1994.Dec,AO2009.May",,"LS1995.Jan,LS2009.Jan",,s3x5
+BYS_NAL,(0 1 1)(1 1 0),log,Tdnolpyear,lp,Easter[4],"AO2007.Dec,AO2009.May",,"LS1994.Dec,LS2008.Dec",,s3x5
+B_NAL,(0 1 1)(1 1 0),log,Tdnolpyear,lp,Easter[4],"AO1993.Dec,AO2007.Dec",,"LS1994.Dec,LS2008.Dec",,s3x5
+SERV_NAL,(0 1 0)(0 1 1),log,Tdnolpyear,lp,,"AO2009.May,AO2011.Nov,AO2013.May,AO2020.Mar",,"LS1995.Jan,LS1995.Apr,LS2008.Jul",,s3x3
+IMPORTS,( 0 1 1])(0 1 1),log,Td,,Easter[3],"AO1995.Aug,AO1998.Dec","TC1997.Jan,TC1994.Jun,TC2000.Nov,TC2003.Jan","LS1995.Jan,LS2009.Jan",,s3x5
